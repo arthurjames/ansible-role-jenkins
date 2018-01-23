@@ -1,0 +1,46 @@
+---
+
+jenkins_version: 2.98
+jenkins_package_state: present
+
+# Task: Modify variables in init file
+jenkins_url_prefix: ""
+jenkins_java_options: -Djenkins.install.runSetupWizard=false -Djenkins.CLI.disabled=true -Xmx2048m
+
+jenkins_init_changes:
+  - option: "JENKINS_ARGS"
+    value: "--prefix={{ jenkins_url_prefix }}"
+  - option: "JAVA_ARGS"
+    value: "{{ jenkins_java_options }}"
+
+# Task: Set the jenkins home directory in init file
+jenkins_home: /var/lib/jenkins
+
+# Task: Set HTTP port in init file
+jenkins_http_port: 8080
+
+# Task: Wait for jenkins to start up before proceeding
+jenkins_hostname: localhost
+jenkins_connection_retries: 60
+jenkins_connection_delay: 5
+
+# Task: Ensure jenkins home {{ jenkins_home }} exists
+jenkins_user: jenkins
+jenkins_group: jenkins
+
+jenkins_admin_username: admin
+jenkins_admin_password: admin
+jenkins_admin_fullname: Marc Lambrichs
+jenkins_admin_email: marc.lambrichs@gmail.com
+jenkins_context_path: ''
+jenkins_security_enabled: true
+
+jenkins_plugins:
+  - bitbucket
+  - branch-api
+  - build-timeout
+  - git
+  - golang
+  - mercurial
+  - slack
+  - workflow-multibranch

@@ -1,0 +1,8 @@
+---
+
+- name: Ensure Jenkins is started and runs on startup
+  service:
+    name: jenkins
+    enabled: yes
+  notify:
+    - Restart jenkins

@@ -1,0 +1,33 @@
+---
+
+# Install Jenkins plugins
+
+- name: Install plugins
+  jenkins_plugin:
+    name: "{{ item }}"
+    state: present
+    jenkins_home: "{{ jenkins_home }}"
+    url: "{{ jenkins_url_local }}"
+    params:
+      url_username: "{{ jenkins_dynamic_admin_username | default(omit) }}"
+    url_password: "{{ jenkins_dynamic_admin_password | default(omit) }}"
+    validate_certs: "{{ false if ansible_distribution_release == 'trusty' else true }}"
+  with_items:
+    - "{{ jenkins_plugins }}"
+  become: true
+  notify: Restart service jenkins
+
+- name: Update plugins
+  jenkins_plugin:
+    name: "{{ item }}"
+    state: latest
+    jenkins_home: "{{ jenkins_home }}"
+    url: "{{ jenkins_url_local }}"
+    params:
+      url_username: "{{ jenkins_dynamic_admin_username | default(omit) }}"
+    url_password: "{{ jenkins_dynamic_admin_password | default(omit) }}"
+    validate_certs: "{{ false if ansible_distribution_release == 'trusty' else true }}"
+  with_items:
+    - "{{ jenkins_plugins }}"
+  become: true
+  notify: Restart service jenkins    

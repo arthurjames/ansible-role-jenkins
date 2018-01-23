@@ -1,0 +1,35 @@
+#!/usr/bin/groovy
+
+import jenkins.*
+import jenkins.model.*
+import hudson.*
+import hudson.model.*
+
+// Enable the slave agent port
+if (Jenkins.instance.slaveAgentPort != 0) {
+   Jenkins.instance.slaveAgentPort=0
+   println "Changed slave agent configuration."
+}
+
+def locationConfig = JenkinsLocationConfiguration.get()
+
+// Set the Jenkins external URL, if defined.
+def externalUrl = "{{ jenkins_hostname | default('') | trim }}" ?: null
+println("Configuring Jenkins External URL (current URL: '\${locationConfig.url}')...")
+
+// Set Jenkins URL
+if (externalUrl != locationConfig.url) {
+   locationConfig.url = externalUrl       
+   locationConfig.save()
+   println "Changed external URL"
+}
+
+def adminEmailAddress = "{{ jenkins_admin_email | default('') | trim }}" ?: null
+// Set System Admin e-mail address
+if (adminEmailAddress != locationConfig.getAdminAddress()) {
+    locationConfig.setAdminAddress("{{ jenkins_admin_fullname }} <{{jenkins_admin_email }}>")
+    locationConfig.save()
+    println "Changed admin email address"
+}
+
+

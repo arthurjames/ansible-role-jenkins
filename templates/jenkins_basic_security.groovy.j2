@@ -1,0 +1,38 @@
+#!/usr/bin/groovy
+
+import hudson.security.*
+import hudson.tasks.Mailer.*
+import jenkins.model.*
+
+// Configure the security realm, which handles authentication
+def securityRealm = new HudsonPrivateSecurityRealm(false)
+
+if (!securityRealm.equals(Jenkins.instance.getSecurityRealm())) {
+    Jenkins.instance.setSecurityRealm(securityRealm)
+
+    def users = securityRealm.getAllUsers()
+    users_s = users.collect { it.toString() }
+
+    // Create the admin user account if it doesn't already exist
+    if ("{{ jenkins_admin_username }}" in users_s) {
+	println "Admin user already exists - updating password"
+
+	def user = hudson.model.User.get('{{ jenkins_admin_username }}');
+	def password = hudson.security.HudsonPrivateSecurityRealm.Details.fromPlainPassword('{{ jenkins_admin_password }}')
+	user.addProperty(password)
+	user.save()
+    } else {
+	println "--> creating local admin user"
+
+	def adminUser = securityRealm.createAccount('{{ jenkins_admin_username }}', '{{ jenkins_admin_password }}')
+	adminUser.save()
+
+	def strategy = new FullControlOnceLoggedInAuthorizationStrategy()
+	if (!strategy.equals(Jenkins.instance.getAuthorizationStrategy())) {
+	    strategy.setAllowAnonymousRead(false)
+	    Jenkins.instance.setAuthorizationStrategy(strategy)
+	    Jenkins.instance.save()
+	    println "Changed authorization."
+	}
+    }
+}

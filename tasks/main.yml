@@ -1,0 +1,30 @@
+---
+
+# Setup OS specific variables
+- name: Include OS-Specific variables
+  include_vars: "{{ ansible_os_family }}.yml"
+
+- name: Define Jenkins apt repository key
+  set_fact:
+    jenkins_repo_key_url: "{{ __jenkins_repo_key_url }}"
+  when: jenkins_repo_key_url is not defined
+
+- name: Define Jenkins apt repository
+  set_fact:
+    jenkins_repo_url: "{{ __jenkins_repo_url }}"
+  when: jenkins_repo_url is not defined
+
+- name: Define Jenkins package url
+  set_fact:
+    jenkins_pkg_url: "{{ __jenkins_pkg_url }}"
+  when: jenkins_pkg_url is not defined
+
+# Install jenkins
+- import_tasks: setup-Debian.yml
+  when: ansible_os_family == 'Debian'
+
+# Prepare jenkins for first start
+- import_tasks: configuration.yml
+
+# Enable jenkins service
+- import_tasks: service.yml

@@ -1,0 +1,105 @@
+---
+
+- name: Modify variables in init file
+  lineinfile:
+    dest: "{{ jenkins_init_file }}"
+    insertafter: '^{{ item.option }}='
+    regexp: '^{{ item.option}}=\"\${{ item.option }} '
+    line: '{{ item.option }}="${{ item.option }} {{ item.value }}"'
+    state: present
+  with_items:
+      "{{ jenkins_init_changes }}"
+  register: jenkins_init_prefix
+
+- name: Set the Jenkins home directory in init file
+  lineinfile:
+    dest: "{{ jenkins_init_file }}"
+    regexp: '^JENKINS_HOME=.*'
+    line: 'JENKINS_HOME={{ jenkins_home }}'
+  register: jenkins_home_config
+
+- name: Immediately restart Jenkins on init config changes
+  service:
+    name: jenkins
+    state: restarted
+  when: jenkins_init_prefix.changed
+
+- name: Set HTTP port in init file
+  lineinfile:
+    backrefs: yes
+    dest: "{{ jenkins_init_file }}"
+    regexp: '^HTTP_PORT='
+    line: 'HTTP_PORT={{ jenkins_http_port }}'
+  register: jenkins_http_config
+
+- name: Ensure jenkins_home {{ jenkins_home }} exists
+  file:
+    path: "{{ jenkins_home }}"
+    state: directory
+    owner: "{{ jenkins_user }}"
+    group: "{{ jenkins_group }}"
+    mode: 0700
+
+# Reference: https://wiki.jenkins-ci.org/display/JENKINS/Post-initialization+script    
+- name: Create jenkins custom init scripts directory
+  file:
+    path: "{{ jenkins_home }}/init.groovy.d"
+    state: directory
+    owner: "{{ jenkins_user }}"
+    group: "{{ jenkins_group }}"
+    mode: 0775
+  become: true
+
+- name: Determine API connection variables
+  set_fact:
+    jenkins_url_local: "http://localhost:{{ jenkins_http_port }}{{ jenkins_context_path }}"
+    jenkins_dynamic_admin_username: "{{ (jenkins_admin_username | default(None)) if (jenkins_security_enabled | bool) else None }}"
+    jenkins_dynamic_admin_password: "{{ (jenkins_admin_password | default(None)) if (jenkins_security_enabled | bool) else None }}"
+
+- debug: msg="jenkins_dynamic_admin_username = {{ jenkins_dynamic_admin_username }}"
+  when: jenkins_dynamic_admin_username is defined
+
+- debug: msg="jenkins_dynamic_admin_password = {{ jenkins_dynamic_admin_password }}"
+  when: jenkins_dynamic_admin_password is defined
+
+- name: Copy basic security script
+  template:
+    src: jenkins_basic_security.groovy.j2
+    dest: "{{ jenkins_home }}/init.groovy.d/jenkins_basic_security.groovy"
+    owner: "{{ jenkins_user }}"
+    group: "{{ jenkins_group }}"
+    mode: 0775
+  notify: Restart service jenkins
+
+- name: Force to restart service jenkins
+  meta: flush_handlers
+
+# Add jenkins plugins
+- import_tasks: plugins.yml
+
+- name: Configure jenkins (miscellaneous settings)
+  jenkins_script:
+    url: "{{ jenkins_url_local }}"
+    user: "{{ jenkins_dynamic_admin_username | default(omit) }}"
+    password: "{{ jenkins_dynamic_admin_password | default(omit) }}"
+    script: "{{ lookup('template', 'templates/jenkins_miscellaneous.groovy.j2') }}"
+  register: shell_jenkins_config_misc
+  changed_when: "(shell_jenkins_config_misc | success) and 'Changed' in shell_jenkins_config_misc.output"
+
+- name: Configure security recommendations
+  jenkins_script:
+    url: "{{ jenkins_url_local }}"
+    user: "{{ jenkins_dynamic_admin_username | default(omit) }}"
+    password: "{{ jenkins_dynamic_admin_password | default(omit) }}"
+    script: "{{ lookup('file', 'files/jenkins_security.groovy') }}"
+  register: shell_jenkins_security_recommendations
+  changed_when: "(shell_jenkins_security_recommendations | success) and 'Changed' in shell_jenkins_security_recommendations.output"
+
+
+- name: Immediately restart jenkins on http or user changes
+  service:
+    name: jenkins
+    state: restarted
+  when: (jenkins_users_config is defined and jenkins_users_config.changed) or
+        (jenkins_http_config is defined or jenkins_http_config.changed) or
+        (jenkins_home_config is defined and jenkins_home_config.changed)
